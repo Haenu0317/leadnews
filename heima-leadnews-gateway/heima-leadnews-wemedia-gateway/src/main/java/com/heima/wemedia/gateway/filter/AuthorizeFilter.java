@@ -25,7 +25,7 @@ public class AuthorizeFilter implements Ordered, GlobalFilter {
         ServerHttpResponse response = exchange.getResponse();
 
         //2.判断是否是登录
-        if(request.getURI().getPath().contains("/login")){
+        if (request.getURI().getPath().contains("/login")) {
             //放行
             return chain.filter(exchange);
         }
@@ -34,7 +34,7 @@ public class AuthorizeFilter implements Ordered, GlobalFilter {
         String token = request.getHeaders().getFirst("token");
 
         //4.判断token是否存在
-        if(StringUtils.isBlank(token)){
+        if (StringUtils.isBlank(token)) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return response.setComplete();
         }
@@ -44,11 +44,20 @@ public class AuthorizeFilter implements Ordered, GlobalFilter {
             Claims claimsBody = AppJwtUtil.getClaimsBody(token);
             //是否是过期
             int result = AppJwtUtil.verifyToken(claimsBody);
-            if(result == 1 || result  == 2){
+            if (result == 1 || result == 2) {
                 response.setStatusCode(HttpStatus.UNAUTHORIZED);
                 return response.setComplete();
             }
 
+            //先获取userid
+            Object userId = claimsBody.get("id");
+
+
+            exchange.mutate().request(builder -> {
+                builder.headers(httpHeaders -> {
+                    httpHeaders.add("userId", userId + "");
+                });
+            });
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -59,6 +68,7 @@ public class AuthorizeFilter implements Ordered, GlobalFilter {
 
     /**
      * 优先级设置  值越小  优先级越高
+     *
      * @return
      */
     @Override
