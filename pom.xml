@@ -253,6 +253,13 @@
                 <artifactId>aliyun-java-sdk-core</artifactId>
                 <version>${ali.core.version}</version>
             </dependency>
+            <!--百度智能云 https://cloud.baidu.com/doc/ANTIPORN/s/hk3h6xdbp-->
+            <dependency>
+                <groupId>com.baidu.aip</groupId>
+                <artifactId>java-sdk</artifactId>
+                <version>4.16.2</version>
+            </dependency>
+            <!--百度智能云-->
             <dependency>
                 <groupId>com.aliyun</groupId>
                 <artifactId>aliyun-java-sdk-green</artifactId>
