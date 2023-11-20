@@ -31,7 +31,7 @@ public class MyTestContent {
         JSONObject jsonObject = aipContentCensor.textCensorUserDefined(irregularity);
 
         CensorResult censorResult = new CensorResult();
-        System.out.println("censorResult.getCensorResult(jsonObject) = " + censorResult.textCacn(jsonObject));
+        System.out.println(censorResult.textCacn(jsonObject));
     }
 
     @Test
