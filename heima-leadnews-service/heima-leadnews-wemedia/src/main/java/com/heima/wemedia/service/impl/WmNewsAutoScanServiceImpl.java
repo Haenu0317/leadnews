@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,10 +58,10 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
      * @param id 自媒体文章id
      */
     @Override
+    @Async //异步方法
     public void autoScanWmNews(Integer id) {
 
         WmNews wmNews = wmNewsMapper.selectById(id);
-
         if (wmNews == null) {
             throw new RuntimeException("WmNewsAutoScanServiceImpl-文章不存在");
         }
