@@ -1,8 +1,10 @@
 package com.heima.wemedia.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.dfa.SensitiveUtil;
 import com.alibaba.fastjson.JSONArray;
 import com.baidu.aip.contentcensor.AipContentCensor;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.heima.apis.article.IArticleClient;
 import com.heima.common.baiduyun.BaiDuYunContentModerationUtil;
 import com.heima.common.baiduyun.result.CensorResult;
@@ -11,9 +13,12 @@ import com.heima.model.article.dtos.ArticleDto;
 import com.heima.model.common.dtos.ResponseResult;
 import com.heima.model.wemedia.pojos.WmChannel;
 import com.heima.model.wemedia.pojos.WmNews;
+import com.heima.model.wemedia.pojos.WmSensitive;
 import com.heima.model.wemedia.pojos.WmUser;
+import com.heima.utils.common.SensitiveWordUtil;
 import com.heima.wemedia.mapper.WmChannelMapper;
 import com.heima.wemedia.mapper.WmNewsMapper;
+import com.heima.wemedia.mapper.WmSensitiveMapper;
 import com.heima.wemedia.mapper.WmUserMapper;
 import com.heima.wemedia.service.WmNewsAutoScanService;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +57,9 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
     @Resource
     private WmUserMapper wmUserMapper;
 
+    @Resource
+    private WmSensitiveMapper wmSensitiveMapper;
+
     /**
      * 自媒体文章审核
      *
@@ -70,6 +78,12 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
             //提取
             Map<String, Object> textAndImages = handleTextAndImages(wmNews);
 
+            //自管理敏感词过滤
+            boolean isSensitive= handleSensitiveScan((String) textAndImages.get("content"), wmNews);
+            if (!isSensitive) {
+                log.error("WmNewsAutoScanServiceImpl-文章审核，当前文章中存在违规内容");
+                return;
+            }
             //审核文本
             boolean isTextScan = handleTextScan((String) textAndImages.get("content"), wmNews);
 
@@ -86,6 +100,7 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
             }
 
 
+
             //4.审核成功，保存app端的相关的文章数据
             ResponseResult responseResult = saveAppArticle(wmNews);
             if (!responseResult.getCode().equals(200)) {
@@ -98,6 +113,27 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
         }
 
 
+    }
+
+    /**
+     * 自管理敏感词审核
+     * @param content
+     * @param wmNews
+     * @return
+     */
+    private boolean handleSensitiveScan(String content, WmNews wmNews) {
+        boolean flag = true;
+        List<WmSensitive> wmSensitives = wmSensitiveMapper.selectList(Wrappers.<WmSensitive>lambdaQuery().select(WmSensitive::getSensitives));
+        List<String> sensitivceList = wmSensitives.stream().map(WmSensitive::getSensitives).collect(Collectors.toList());
+        SensitiveWordUtil.initMap(sensitivceList);
+        Map<String, Integer> map = SensitiveWordUtil.matchWords(content);
+
+        if(!map.isEmpty()){
+            updateWmNews(wmNews,(short) 2,"当前文章中存在违规内容"+map);
+            flag = false;
+        }
+
+        return flag;
     }
 
     /**
