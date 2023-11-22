@@ -38,6 +38,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.heima.common.constant.WemediaConstants.WM_NEWS_TYPE_AUTO;
+import static com.heima.model.wemedia.pojos.WmNews.Status.PUBLISHED;
+import static com.heima.model.wemedia.pojos.WmNews.Status.SUCCESS;
 
 @Slf4j
 @Service
@@ -150,6 +152,23 @@ public class WmNewsServiceImpl extends ServiceImpl<WmNewsMapper, WmNews> impleme
         saveRelativeInfoForCover(dto, wmNews, materials);
         wmNewsAutoScanService.autoScanWmNews(wmNews.getId());
         return ResponseResult.okResult(AppHttpCodeEnum.SUCCESS);
+    }
+
+    /**
+     * 删除文章
+     * @param id
+     * @return
+     */
+    @Override
+    public ResponseResult delNews(Integer id) {
+        WmNews wmNews = getById(id);
+        if (wmNews == null){
+            return ResponseResult.errorResult(AppHttpCodeEnum.DATA_NOT_EXIST,"文章不存在!");
+        }
+        if (wmNews.getStatus() == 9){
+            return ResponseResult.errorResult(AppHttpCodeEnum.PARAM_INVALID, "文章已发布,不能删除!");
+        }
+        return removeById(id) ? ResponseResult.okResult(SUCCESS) : ResponseResult.errorResult(AppHttpCodeEnum.DELETE_ERROR);
     }
 
     /**
