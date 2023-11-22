@@ -1,13 +1,13 @@
 package com.heima.wemedia.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.dfa.SensitiveUtil;
 import com.alibaba.fastjson.JSONArray;
 import com.baidu.aip.contentcensor.AipContentCensor;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.heima.apis.article.IArticleClient;
 import com.heima.common.baiduyun.BaiDuYunContentModerationUtil;
 import com.heima.common.baiduyun.result.CensorResult;
+import com.heima.common.tess4j.Tess4jClient;
 import com.heima.file.service.FileStorageService;
 import com.heima.model.article.dtos.ArticleDto;
 import com.heima.model.common.dtos.ResponseResult;
@@ -30,6 +30,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -60,6 +64,9 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
     @Resource
     private WmSensitiveMapper wmSensitiveMapper;
 
+    @Resource
+    private Tess4jClient tess4jClient;
+
     /**
      * 自媒体文章审核
      *
@@ -79,7 +86,7 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
             Map<String, Object> textAndImages = handleTextAndImages(wmNews);
 
             //自管理敏感词过滤
-            boolean isSensitive= handleSensitiveScan((String) textAndImages.get("content"), wmNews);
+            boolean isSensitive = handleSensitiveScan((String) textAndImages.get("content"), wmNews);
             if (!isSensitive) {
                 log.error("WmNewsAutoScanServiceImpl-文章审核，当前文章中存在违规内容");
                 return;
@@ -94,11 +101,10 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
 
             //审核图片
             boolean isImageScan = handleImageScan((List<String>) textAndImages.get("images"), wmNews);
-            if (!isImageScan){
+            if (!isImageScan) {
                 log.error("WmNewsAutoScanServiceImpl-文章审核，当前文章中图片存在违规内容");
                 return;
             }
-
 
 
             //4.审核成功，保存app端的相关的文章数据
@@ -108,7 +114,7 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
             }
             //回填article_id
             wmNews.setArticleId((Long) responseResult.getData());
-            updateWmNews(wmNews,(short) 9,"审核成功");
+            updateWmNews(wmNews, (short) 9, "审核成功");
 
         }
 
@@ -117,6 +123,7 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
 
     /**
      * 自管理敏感词审核
+     *
      * @param content
      * @param wmNews
      * @return
@@ -128,8 +135,8 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
         SensitiveWordUtil.initMap(sensitivceList);
         Map<String, Integer> map = SensitiveWordUtil.matchWords(content);
 
-        if(!map.isEmpty()){
-            updateWmNews(wmNews,(short) 2,"当前文章中存在违规内容"+map);
+        if (!map.isEmpty()) {
+            updateWmNews(wmNews, (short) 2, "当前文章中存在违规内容" + map);
             flag = false;
         }
 
@@ -145,7 +152,7 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
     private ResponseResult saveAppArticle(WmNews wmNews) {
         ArticleDto articleDto = new ArticleDto();
         BeanUtil.copyProperties(wmNews, articleDto);
-        if (wmNews.getArticleId() == null){
+        if (wmNews.getArticleId() == null) {
             articleDto.setId(null);
         }
         articleDto.setLayout(Integer.valueOf(wmNews.getType()));
@@ -189,9 +196,22 @@ public class WmNewsAutoScanServiceImpl implements WmNewsAutoScanService {
         images = images.stream().distinct().collect(Collectors.toList());
         List<byte[]> imageList = new ArrayList<>();
 
-        for (String image : images) {
-            byte[] bytes = fileStorageService.downLoadFile(image);
-            imageList.add(bytes);
+        try {
+            for (String image : images) {
+                byte[] bytes = fileStorageService.downLoadFile(image);
+                //图片识别
+                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+                BufferedImage read = ImageIO.read(byteArrayInputStream);
+                String result = tess4jClient.doOCR(read);
+                //过滤文字
+                boolean isSensitive = handleTextScan(result, wmNews);
+                if (!isSensitive){
+                    return isSensitive;
+                }
+                imageList.add(bytes);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         AipContentCensor aipContentCensor = contentModerationUtil.contentScan();
         CensorResult censorResult = new CensorResult();
