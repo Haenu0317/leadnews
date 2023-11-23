@@ -52,6 +52,65 @@ public class TaskServiceImpl implements TaskService {
     }
 
     /**
+     * 取消任务
+     *
+     * @param taskId 任务id
+     * @return 取消结果
+     */
+    @Override
+    public boolean cancelTask(long taskId) {
+        boolean flag = false;
+        //删除任务 更新日志
+        Task task = updateDb(taskId, ScheduleConstants.CANCELLED);
+
+        if (task != null) {
+            flag = true;
+            removeTaskFromCache(task);
+        }
+        return flag;
+    }
+
+    /**
+     * 从缓存中删除
+     *
+     * @param task
+     */
+    private void removeTaskFromCache(Task task) {
+        String key = task.getTaskType() + "_" + task.getPriority();
+        if (task.getExecuteTime() <= System.currentTimeMillis()) {
+            cacheService.lRemove(ScheduleConstants.TOPIC + key, 0, JSON.toJSONString(task));
+        } else {
+            cacheService.zRemove(ScheduleConstants.FUTURE + key, JSON.toJSONString(task));
+        }
+    }
+
+    /**
+     * 删除任务 更新日志
+     *
+     * @param taskId
+     * @param cancelled
+     * @return
+     */
+    private Task updateDb(long taskId, int cancelled) {
+        Task task = null;
+        try {
+            taskinfoMapper.deleteById(taskId);
+
+            TaskinfoLogs taskinfoLogs = taskinfoLogsMapper.selectById(taskId);
+            taskinfoLogs.setStatus(cancelled);
+            taskinfoLogsMapper.updateById(taskinfoLogs);
+
+            task = new Task();
+            BeanUtils.copyProperties(taskinfoLogs, task);
+            task.setExecuteTime(taskinfoLogs.getExecuteTime().getTime());
+        } catch (BeansException e) {
+            log.error("task cancel exception taskId = {}", task);
+        }
+
+        return task;
+    }
+
+    /**
      * 缓存到数据库
      *
      * @param task

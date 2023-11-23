@@ -17,6 +17,7 @@ public class TaskServiceImplTest {
 
     @Resource
     private TaskService taskService;
+
     @Test
     public void addTask() {
         Task task = new Task();
@@ -26,5 +27,10 @@ public class TaskServiceImplTest {
         task.setExecuteTime(new Date().getTime() + 5000000);
         long taskId = taskService.addTask(task);
         System.out.println(taskId);
+    }
+
+    @Test
+    public void cancelTask() {
+        taskService.cancelTask(1727585648103165954L);
     }
 }
