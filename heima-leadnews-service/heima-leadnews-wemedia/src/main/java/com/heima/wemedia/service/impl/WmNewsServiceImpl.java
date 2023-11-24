@@ -24,6 +24,7 @@ import com.heima.wemedia.mapper.WmNewsMapper;
 import com.heima.wemedia.mapper.WmNewsMaterialMapper;
 import com.heima.wemedia.service.WmNewsAutoScanService;
 import com.heima.wemedia.service.WmNewsService;
+import com.heima.wemedia.service.WmNewsTaskService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +39,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.heima.common.constant.WemediaConstants.WM_NEWS_TYPE_AUTO;
-import static com.heima.model.wemedia.pojos.WmNews.Status.PUBLISHED;
 import static com.heima.model.wemedia.pojos.WmNews.Status.SUCCESS;
 
 @Slf4j
@@ -55,6 +55,9 @@ public class WmNewsServiceImpl extends ServiceImpl<WmNewsMapper, WmNews> impleme
     //异步调用
     @Resource
     private WmNewsAutoScanService wmNewsAutoScanService;
+
+    @Autowired
+    private WmNewsTaskService wmNewsTaskService;
 
     /**
      * 查询文章
@@ -150,22 +153,26 @@ public class WmNewsServiceImpl extends ServiceImpl<WmNewsMapper, WmNews> impleme
 
         //4.不是草稿，保存文章封面图片与素材的关系，如果当前布局是自动，需要匹配封面图片
         saveRelativeInfoForCover(dto, wmNews, materials);
-        wmNewsAutoScanService.autoScanWmNews(wmNews.getId());
+
+        //wmNewsAutoScanService.autoScanWmNews(wmNews.getId());
+
+        wmNewsTaskService.addNewsToTask(wmNews.getId(), wmNews.getPublishTime());
         return ResponseResult.okResult(AppHttpCodeEnum.SUCCESS);
     }
 
     /**
      * 删除文章
+     *
      * @param id
      * @return
      */
     @Override
     public ResponseResult delNews(Integer id) {
         WmNews wmNews = getById(id);
-        if (wmNews == null){
-            return ResponseResult.errorResult(AppHttpCodeEnum.DATA_NOT_EXIST,"文章不存在!");
+        if (wmNews == null) {
+            return ResponseResult.errorResult(AppHttpCodeEnum.DATA_NOT_EXIST, "文章不存在!");
         }
-        if (wmNews.getStatus() == 9){
+        if (wmNews.getStatus() == 9) {
             return ResponseResult.errorResult(AppHttpCodeEnum.PARAM_INVALID, "文章已发布,不能删除!");
         }
         return removeById(id) ? ResponseResult.okResult(SUCCESS) : ResponseResult.errorResult(AppHttpCodeEnum.DELETE_ERROR);
