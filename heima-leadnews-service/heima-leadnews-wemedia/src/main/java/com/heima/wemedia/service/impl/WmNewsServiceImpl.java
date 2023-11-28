@@ -213,7 +213,7 @@ public class WmNewsServiceImpl extends ServiceImpl<WmNewsMapper, WmNews> impleme
             if(wmNews.getArticleId() != null){
                 Map<String,Object> map = new HashMap<>();
                 map.put("articleId",wmNews.getArticleId());
-                map.puble",dto.getEnable());
+                map.put("enable",dto.getEnable());
                 kafkaTemplate.send(WmNewsMessageConstants.WM_NEWS_UP_OR_DOWN_TOPIC,JSON.toJSONString(map));
             }
 
